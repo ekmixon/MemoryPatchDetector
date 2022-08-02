@@ -11,10 +11,7 @@ PSAPI = ctypes.windll.psapi
 IMAGE_SCN_MEM_EXECUTE = 0x20000000
 
 # Change address size by system architecture
-if winappdbg.System.bits == 64:
-    PTR = ctypes.c_uint64
-else:
-    PTR = ctypes.c_void_p
+PTR = ctypes.c_uint64 if winappdbg.System.bits == 64 else ctypes.c_void_p
 
 
 def list_relocations(relocations, size, virtual_address):
@@ -53,9 +50,10 @@ def parse_relocations(proc, module_base_address, pe, data_rva, rva, size):
             base_rva=rva,
             rva=relocation_offset + rva)
 
-        if relocation_data.struct.Data > 0 and \
-                (relocation_data.type == pefile.RELOCATION_TYPE['IMAGE_REL_BASED_HIGHLOW'] or
-                 relocation_data.type == pefile.RELOCATION_TYPE['IMAGE_REL_BASED_DIR64']):
+        if relocation_data.struct.Data > 0 and relocation_data.type in [
+            pefile.RELOCATION_TYPE['IMAGE_REL_BASED_HIGHLOW'],
+            pefile.RELOCATION_TYPE['IMAGE_REL_BASED_DIR64'],
+        ]:
             entries.append(relocation_data)
         file_offset += entry.sizeof()
 
@@ -100,7 +98,7 @@ def get_relocations(pe, proc, module_base_address):
 
         return relocations
     except Exception as ex:
-        print(str(ex))
+        print(ex)
 
 
 def analyze_process(pid):
@@ -151,7 +149,7 @@ def analyze_process(pid):
                 module_obj['additional_sections'].append(additional_sections)
                 continue
 
-            for idx in range(0, len(mem_exec_sections)):
+            for idx in range(len(mem_exec_sections)):
                 mem_section_data = proc.read(module_base_addr + mem_exec_sections[idx].VirtualAddress,
                                              mem_exec_sections[idx].Misc_VirtualSize)
                 disk_section_data = disk_exec_sections[idx].get_data()[:mem_exec_sections[idx].Misc_VirtualSize]
@@ -205,23 +203,23 @@ def analyze_process(pid):
                 process_patches['modules'].append(module_obj)
         except OSError as ex:
             if ex.winerror != 299:
-                print(str(ex))
+                print(ex)
     return process_patches
 
 
 def print_process_patches(process_patches):
     print("Patches in PID {0}, File {1}".format(process_patches['pid'], process_patches['file']))
     for module in process_patches['modules']:
-        print("Module {}".format(module['file']))
+        print(f"Module {module['file']}")
         for patch in module['patches']:
             if patch['disk_code'] != '' and patch['mem_code'] != '':
                 print("Disk Code: ")
-                print("{}".format(patch['disk_code']))
+                print(f"{patch['disk_code']}")
                 print("Memory Code: ")
-                print("{}".format(patch['mem_code']))
+                print(f"{patch['mem_code']}")
         for section in module['additional_sections']:
             print("Additional executable section: ")
-            print("{}".format(section.Name))
+            print(f"{section.Name}")
 
 
 def get_process_patches(process_ids=None):
@@ -236,9 +234,9 @@ def get_process_patches(process_ids=None):
                 print_process_patches(process_patches)
                 processes_patches.append(process_patches)
             else:
-                print("No patches in process ID: {}".format(pid))
+                print(f"No patches in process ID: {pid}")
         except Exception as ex:
-            print("Error analyzing process ID: {}".format(pid))
+            print(f"Error analyzing process ID: {pid}")
     return processes_patches
 
 
